@@ -1,12 +1,12 @@
-import { FastifyPluginAsyncJsonSchemaToTs } from "@fastify/type-provider-json-schema-to-ts";
-import { idParamSchema } from "../../utils/reusedSchemas";
-import { changeMemberTypeBodySchema } from "./schema";
-import type { MemberTypeEntity } from "../../utils/DB/entities/DBMemberTypes";
+import { FastifyPluginAsyncJsonSchemaToTs } from '@fastify/type-provider-json-schema-to-ts';
+import { idParamSchema } from '../../utils/reusedSchemas';
+import { changeMemberTypeBodySchema } from './schema';
+import type { MemberTypeEntity } from '../../utils/DB/entities/DBMemberTypes';
 
 const plugin: FastifyPluginAsyncJsonSchemaToTs = async (
   fastify
 ): Promise<void> => {
-  fastify.get("/", async function (request, reply): Promise<
+  fastify.get('/', async function (request, reply): Promise<
     MemberTypeEntity[]
   > {
     const memberTypes = await fastify.db.memberTypes.findMany();
@@ -14,7 +14,7 @@ const plugin: FastifyPluginAsyncJsonSchemaToTs = async (
   });
 
   fastify.get(
-    "/:id",
+    '/:id',
     {
       schema: {
         params: idParamSchema,
@@ -22,18 +22,20 @@ const plugin: FastifyPluginAsyncJsonSchemaToTs = async (
     },
     async function (request, reply): Promise<MemberTypeEntity> {
       const memberTypeById = await fastify.db.memberTypes.findOne({
-        key: "id",
+        key: 'id',
         equals: request.params.id,
       });
+
       if (memberTypeById === null) {
-        throw fastify.httpErrors.notFound("Member type not found!");
+        throw fastify.httpErrors.notFound('Member type is not founded!');
       }
+
       return memberTypeById;
     }
   );
 
   fastify.patch(
-    "/:id",
+    '/:id',
     {
       schema: {
         body: changeMemberTypeBodySchema,
@@ -41,11 +43,21 @@ const plugin: FastifyPluginAsyncJsonSchemaToTs = async (
       },
     },
     async function (request, reply): Promise<MemberTypeEntity> {
-      const changeMemberType = await fastify.db.memberTypes.change(
+      const memberTypeById = await fastify.db.memberTypes.findOne({
+        key: 'id',
+        equals: request.params.id,
+      });
+
+      if (memberTypeById === null) {
+        throw fastify.httpErrors.badRequest('You use a wrong id!');
+      }
+
+      const updatedMemberType = await fastify.db.memberTypes.change(
         request.params.id,
         request.body
       );
-      return changeMemberType;
+
+      return updatedMemberType;
     }
   );
 };

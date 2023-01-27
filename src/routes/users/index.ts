@@ -227,7 +227,6 @@ const plugin: FastifyPluginAsyncJsonSchemaToTs = async (
         request.params.id,
         request.body
       );
-
       return updatedUser;
     }
   );

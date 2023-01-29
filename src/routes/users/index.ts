@@ -101,18 +101,16 @@ const plugin: FastifyPluginAsyncJsonSchemaToTs = async (
 
       posts.forEach(async (post) => await fastify.db.posts.delete(post.id));
 
-      const profiles = await fastify.db.profiles.findMany({
+      const profile = await fastify.db.profiles.findOne({
         key: 'userId',
         equals: request.params.id,
       });
 
-      if (profiles.length === 0) {
+      if (profile === null) {
         throw fastify.httpErrors.notFound('Profile is not founded!');
       }
 
-      profiles.forEach(
-        async (profile) => await fastify.db.profiles.delete(profile.id)
-      );
+      await fastify.db.profiles.delete(profile.id);
 
       const deletedUser = await fastify.db.users.delete(request.params.id);
 

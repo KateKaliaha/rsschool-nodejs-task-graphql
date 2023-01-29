@@ -10,9 +10,12 @@ import {
   GraphQLInputObjectType,
   GraphQLNonNull,
 } from 'graphql';
+import { MemberTypeEntity } from '../../../utils/DB/entities/DBMemberTypes';
 import { PostEntity } from '../../../utils/DB/entities/DBPosts';
 import { ProfileEntity } from '../../../utils/DB/entities/DBProfiles';
 import { UserEntity } from '../../../utils/DB/entities/DBUsers';
+
+type ChangeMemberTypeDTO = Partial<Omit<MemberTypeEntity, 'id'>>;
 
 const memberType = new GraphQLObjectType({
   name: 'memberType',
@@ -54,6 +57,40 @@ const memberTypeQuery = {
     }
 
     return memberTypeById;
+  },
+};
+
+const updateMemberTypeData = new GraphQLInputObjectType({
+  name: 'updateMemberType',
+  fields: {
+    discount: { type: new GraphQLNonNull(GraphQLInt) },
+    monthPostsLimit: { type: new GraphQLNonNull(GraphQLInt) },
+  },
+});
+
+const updateMemberType = {
+  type: memberType,
+  args: {
+    id: { type: new GraphQLNonNull(GraphQLString) },
+    data: { type: updateMemberTypeData },
+  },
+  resolve: async (
+    _: any,
+    { id, data }: { id: string; data: ChangeMemberTypeDTO },
+    fastify: FastifyInstance
+  ) => {
+    const memberTypeById = await fastify.db.memberTypes.findOne({
+      key: 'id',
+      equals: id,
+    });
+
+    if (memberTypeById === null) {
+      throw fastify.httpErrors.badRequest('You use a wrong id!');
+    }
+
+    const updatedMemberType = await fastify.db.memberTypes.change(id, data);
+
+    return updatedMemberType;
   },
 };
 
@@ -131,6 +168,41 @@ const createPost = {
     }
     const newPost = await fastify.db.posts.create(data);
     return newPost;
+  },
+};
+
+const updatePostData = new GraphQLInputObjectType({
+  name: 'updatePostData',
+  fields: {
+    title: { type: new GraphQLNonNull(GraphQLString) },
+    content: { type: new GraphQLNonNull(GraphQLString) },
+    userId: { type: new GraphQLNonNull(GraphQLID) },
+  },
+});
+
+const updatePost = {
+  type: postType,
+  args: {
+    id: { type: new GraphQLNonNull(GraphQLID) },
+    data: { type: updatePostData },
+  },
+  resolve: async (
+    _: any,
+    { id, data }: { id: string; data: CreatePostDTO },
+    fastify: FastifyInstance
+  ) => {
+    const postById = await fastify.db.posts.findOne({
+      key: 'id',
+      equals: id,
+    });
+
+    if (postById === null) {
+      throw fastify.httpErrors.badRequest('You send incorrect data!');
+    }
+
+    const updatedPost = await fastify.db.posts.change(id, data);
+
+    return updatedPost;
   },
 };
 
@@ -288,21 +360,66 @@ const createUser = {
   },
 };
 
+const updateUserData = new GraphQLInputObjectType({
+  name: 'updateUserData',
+  fields: {
+    firstName: { type: new GraphQLNonNull(GraphQLString) },
+    lastName: { type: new GraphQLNonNull(GraphQLString) },
+    email: { type: new GraphQLNonNull(GraphQLString) },
+  },
+});
+
+const updateUser = {
+  type: userType,
+  args: {
+    id: { type: new GraphQLNonNull(GraphQLID) },
+    data: { type: updateUserData },
+  },
+  resolve: async (
+    _: any,
+    { id, data }: { id: string; data: CreateUserDTO },
+    fastify: FastifyInstance
+  ) => {
+    const userById = await fastify.db.users.findOne({
+      key: 'id',
+      equals: id,
+    });
+
+    if (userById === null) {
+      throw fastify.httpErrors.badRequest('User is not founded!');
+    }
+
+    const updatedUser = await fastify.db.users.change(id, data);
+    return updatedUser;
+  },
+};
+
+const subscribeToUserData = new GraphQLInputObjectType({
+  name: 'subscribeToUserData',
+  fields: {
+    userId: { type: new GraphQLNonNull(GraphQLID) },
+    id: { type: new GraphQLNonNull(GraphQLID) },
+  },
+});
+
 const subscribeToUser = {
   type: userType,
   args: {
-    userId: { type: GraphQLID },
-    id: { type: GraphQLID },
+    data: { type: subscribeToUserData },
   },
-  resolve: async (_: any, args: any, fastify: FastifyInstance) => {
+  resolve: async (
+    _: any,
+    { data }: { data: Record<string, string> },
+    fastify: FastifyInstance
+  ) => {
     const objectSubscribeTo = await fastify.db.users.findOne({
       key: 'id',
-      equals: args.id,
+      equals: data.id,
     });
 
     const subscribeUser = await fastify.db.users.findOne({
       key: 'id',
-      equals: args.userId,
+      equals: data.userId,
     });
 
     if (objectSubscribeTo === null || subscribeUser === null) {
@@ -311,10 +428,10 @@ const subscribeToUser = {
 
     subscribeUser.subscribedToUserIds = [
       ...subscribeUser.subscribedToUserIds,
-      args.id,
+      data.id,
     ];
 
-    const updatedUser = await fastify.db.users.change(args.userId, {
+    const updatedUser = await fastify.db.users.change(data.userId, {
       subscribedToUserIds: [...subscribeUser.subscribedToUserIds],
     });
 
@@ -322,6 +439,57 @@ const subscribeToUser = {
   },
 };
 
+const unsubscribeFromUserData = new GraphQLInputObjectType({
+  name: 'unsubscribeFromUserData',
+  fields: {
+    userId: { type: new GraphQLNonNull(GraphQLID) },
+    id: { type: new GraphQLNonNull(GraphQLID) },
+  },
+});
+
+const unsubscribeFromUser = {
+  type: userType,
+  args: {
+    data: { type: unsubscribeFromUserData },
+  },
+  resolve: async (
+    _: any,
+    { data }: { data: Record<string, string> },
+    fastify: FastifyInstance
+  ) => {
+    const userById = await fastify.db.users.findOne({
+      key: 'id',
+      equals: data.id,
+    });
+
+    if (userById === null) {
+      throw fastify.httpErrors.notFound('User is not founded!');
+    }
+
+    const checkSubscribe = await fastify.db.users.findOne({
+      key: 'id',
+      equals: data.userId,
+    });
+
+    if (checkSubscribe === null) {
+      throw fastify.httpErrors.notFound('User does not have such subscribe!');
+    }
+
+    if (!checkSubscribe.subscribedToUserIds.includes(data.id)) {
+      throw fastify.httpErrors.badRequest('User does not have such subscribe!');
+    }
+
+    const updatedSubscribes = checkSubscribe.subscribedToUserIds.filter(
+      (id) => id !== data.id
+    );
+
+    const updatedUser = await fastify.db.users.change(data.userId, {
+      subscribedToUserIds: updatedSubscribes,
+    });
+
+    return updatedUser;
+  },
+};
 const profileType = new GraphQLObjectType({
   name: 'profileType',
   fields: () => ({
@@ -427,6 +595,54 @@ const createProfile = {
   },
 };
 
+const updateProfileData = new GraphQLInputObjectType({
+  name: 'updateProfileData',
+  fields: {
+    avatar: { type: GraphQLString },
+    sex: { type: GraphQLString },
+    birthday: { type: GraphQLInt },
+    country: { type: GraphQLString },
+    street: { type: GraphQLString },
+    city: { type: GraphQLString },
+    memberTypeId: { type: new GraphQLNonNull(GraphQLString) },
+    userId: { type: new GraphQLNonNull(GraphQLID) },
+  },
+});
+
+const updateProfile = {
+  type: profileType,
+  args: {
+    id: { type: GraphQLID },
+    data: { type: updateProfileData },
+  },
+  resolve: async (
+    _: any,
+    { id, data }: { id: string; data: CreateProfileDTO },
+    fastify: FastifyInstance
+  ) => {
+    if (
+      /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(
+        id
+      ) === false
+    ) {
+      throw fastify.httpErrors.badRequest('ID must be in uuid format!');
+    }
+
+    const profileById = await fastify.db.profiles.findOne({
+      key: 'id',
+      equals: id,
+    });
+
+    if (profileById === null) {
+      throw fastify.httpErrors.badRequest('Profile is not founded!');
+    }
+
+    const updatedProfile = await fastify.db.profiles.change(id, data);
+
+    return updatedProfile;
+  },
+};
+
 const Query = new GraphQLObjectType({
   name: 'Query',
   fields: {
@@ -445,9 +661,14 @@ const Mutation = new GraphQLObjectType({
   name: 'Mutation',
   fields: {
     createUser: createUser,
+    updateUser: updateUser,
     createPost: createPost,
+    updatePost: updatePost,
     createProfile: createProfile,
+    updateProfile: updateProfile,
+    updateMemberType: updateMemberType,
     subscribeToUser: subscribeToUser,
+    unsubscribeFromUser: unsubscribeFromUser,
   },
 });
 

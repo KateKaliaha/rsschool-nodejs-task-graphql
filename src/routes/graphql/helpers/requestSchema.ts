@@ -6,6 +6,9 @@ import {
   GraphQLInt,
   GraphQLID,
   GraphQLList,
+  GraphQLOutputType,
+  GraphQLInputObjectType,
+  GraphQLNonNull,
 } from 'graphql';
 import { PostEntity } from '../../../utils/DB/entities/DBPosts';
 import { ProfileEntity } from '../../../utils/DB/entities/DBProfiles';
@@ -99,28 +102,39 @@ const postQuery = {
 };
 
 type CreatePostDTO = Omit<PostEntity, 'id'>;
+
+const createPostData = new GraphQLInputObjectType({
+  name: 'createPostData',
+  fields: {
+    title: { type: new GraphQLNonNull(GraphQLString) },
+    content: { type: new GraphQLNonNull(GraphQLString) },
+    userId: { type: new GraphQLNonNull(GraphQLID) },
+  },
+});
 const createPost = {
   type: postType,
   args: {
-    title: { type: GraphQLString },
-    content: { type: GraphQLString },
-    userId: { type: GraphQLString },
+    data: { type: createPostData },
   },
-  resolve: async (_: any, args: CreatePostDTO, fastify: FastifyInstance) => {
+  resolve: async (
+    _: any,
+    { data }: { data: CreatePostDTO },
+    fastify: FastifyInstance
+  ) => {
     const userById = await fastify.db.users.findOne({
       key: 'id',
-      equals: args.userId,
+      equals: data.userId,
     });
 
     if (userById === null) {
       return fastify.httpErrors.badRequest('You send incorrect data!');
     }
-    const newPost = await fastify.db.posts.create(args);
+    const newPost = await fastify.db.posts.create(data);
     return newPost;
   },
 };
 
-const userType = new GraphQLObjectType({
+const userType: GraphQLOutputType = new GraphQLObjectType({
   name: 'userType',
   fields: () => ({
     id: { type: GraphQLID },
@@ -179,6 +193,40 @@ const userType = new GraphQLObjectType({
         return memberType;
       },
     },
+    userSubscribedTo: {
+      type: new GraphQLList(userType),
+      async resolve(
+        parent: UserEntity,
+        args: Record<string, string>,
+        fastify: FastifyInstance
+      ) {
+        const users = await fastify.db.users.findMany({
+          key: 'subscribedToUserIds',
+          inArray: parent.id,
+        });
+        return users;
+      },
+    },
+    subscribedToUser: {
+      type: new GraphQLList(userType),
+      async resolve(
+        parent: UserEntity,
+        args: Record<string, string>,
+        fastify: FastifyInstance
+      ) {
+        const subscribes = Promise.all(
+          parent.subscribedToUserIds.map(async (subscribeId) => {
+            const subscribe = await fastify.db.users.findOne({
+              key: 'id',
+              equals: subscribeId,
+            });
+            return subscribe;
+          })
+        );
+
+        return subscribes;
+      },
+    },
   }),
 });
 
@@ -216,17 +264,61 @@ const userQuery = {
 };
 
 type CreateUserDTO = Omit<UserEntity, 'id' | 'subscribedToUserIds'>;
+const createUserData = new GraphQLInputObjectType({
+  name: 'createUserData',
+  fields: {
+    firstName: { type: new GraphQLNonNull(GraphQLString) },
+    lastName: { type: new GraphQLNonNull(GraphQLString) },
+    email: { type: new GraphQLNonNull(GraphQLString) },
+  },
+});
 
 const createUser = {
   type: userType,
   args: {
-    firstName: { type: GraphQLString },
-    lastName: { type: GraphQLString },
-    email: { type: GraphQLString },
+    data: { type: createUserData },
   },
-  resolve: async (_: any, args: CreateUserDTO, fastify: FastifyInstance) => {
-    const newUser = await fastify.db.users.create(args);
+  resolve: async (
+    _: any,
+    { data }: { data: CreateUserDTO },
+    fastify: FastifyInstance
+  ) => {
+    const newUser = await fastify.db.users.create(data);
     return newUser;
+  },
+};
+
+const subscribeToUser = {
+  type: userType,
+  args: {
+    userId: { type: GraphQLID },
+    id: { type: GraphQLID },
+  },
+  resolve: async (_: any, args: any, fastify: FastifyInstance) => {
+    const objectSubscribeTo = await fastify.db.users.findOne({
+      key: 'id',
+      equals: args.id,
+    });
+
+    const subscribeUser = await fastify.db.users.findOne({
+      key: 'id',
+      equals: args.userId,
+    });
+
+    if (objectSubscribeTo === null || subscribeUser === null) {
+      return null;
+    }
+
+    subscribeUser.subscribedToUserIds = [
+      ...subscribeUser.subscribedToUserIds,
+      args.id,
+    ];
+
+    const updatedUser = await fastify.db.users.change(args.userId, {
+      subscribedToUserIds: [...subscribeUser.subscribedToUserIds],
+    });
+
+    return updatedUser;
   },
 };
 
@@ -279,23 +371,33 @@ const profileQuery = {
   },
 };
 type CreateProfileDTO = Omit<ProfileEntity, 'id'>;
+const createProfileData = new GraphQLInputObjectType({
+  name: 'createProfileData',
+  fields: {
+    avatar: { type: new GraphQLNonNull(GraphQLString) },
+    sex: { type: new GraphQLNonNull(GraphQLString) },
+    birthday: { type: new GraphQLNonNull(GraphQLInt) },
+    country: { type: new GraphQLNonNull(GraphQLString) },
+    street: { type: new GraphQLNonNull(GraphQLString) },
+    city: { type: new GraphQLNonNull(GraphQLString) },
+    memberTypeId: { type: new GraphQLNonNull(GraphQLString) },
+    userId: { type: new GraphQLNonNull(GraphQLID) },
+  },
+});
 
 const createProfile = {
   type: profileType,
   args: {
-    avatar: { type: GraphQLString },
-    sex: { type: GraphQLString },
-    birthday: { type: GraphQLInt },
-    country: { type: GraphQLString },
-    street: { type: GraphQLString },
-    city: { type: GraphQLString },
-    memberTypeId: { type: GraphQLString },
-    userId: { type: GraphQLString },
+    data: { type: createProfileData },
   },
-  resolve: async (_: any, args: CreateProfileDTO, fastify: FastifyInstance) => {
+  resolve: async (
+    _: any,
+    { data }: { data: CreateProfileDTO },
+    fastify: FastifyInstance
+  ) => {
     const memberTypeById = await fastify.db.memberTypes.findOne({
       key: 'id',
-      equals: args.memberTypeId,
+      equals: data.memberTypeId,
     });
 
     if (memberTypeById === null) {
@@ -304,7 +406,7 @@ const createProfile = {
 
     if (
       /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(
-        args.userId
+        data.userId
       ) === false
     ) {
       return null;
@@ -312,14 +414,14 @@ const createProfile = {
 
     const profileById = await fastify.db.profiles.findOne({
       key: 'userId',
-      equals: args.userId,
+      equals: data.userId,
     });
 
     if (profileById) {
       return null;
     }
 
-    const newProfile = await fastify.db.profiles.create(args);
+    const newProfile = await fastify.db.profiles.create(data);
 
     return newProfile;
   },
@@ -345,6 +447,7 @@ const Mutation = new GraphQLObjectType({
     createUser: createUser,
     createPost: createPost,
     createProfile: createProfile,
+    subscribeToUser: subscribeToUser,
   },
 });
 

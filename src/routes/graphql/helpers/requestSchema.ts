@@ -88,7 +88,9 @@ const updateMemberType = {
       throw fastify.httpErrors.badRequest('You use a wrong id!');
     }
 
-    const updatedMemberType = await fastify.db.memberTypes.change(id, data);
+    const updatedMemberType = await fastify.db.memberTypes.change(id, {
+      ...data,
+    });
 
     return updatedMemberType;
   },
@@ -174,9 +176,9 @@ const createPost = {
 const updatePostData = new GraphQLInputObjectType({
   name: 'updatePostData',
   fields: {
-    title: { type: new GraphQLNonNull(GraphQLString) },
-    content: { type: new GraphQLNonNull(GraphQLString) },
-    userId: { type: new GraphQLNonNull(GraphQLID) },
+    title: { type: GraphQLString },
+    content: { type: GraphQLString },
+    userId: { type: GraphQLID },
   },
 });
 
@@ -200,7 +202,7 @@ const updatePost = {
       throw fastify.httpErrors.badRequest('You send incorrect data!');
     }
 
-    const updatedPost = await fastify.db.posts.change(id, data);
+    const updatedPost = await fastify.db.posts.change(id, { ...data });
 
     return updatedPost;
   },
@@ -363,9 +365,9 @@ const createUser = {
 const updateUserData = new GraphQLInputObjectType({
   name: 'updateUserData',
   fields: {
-    firstName: { type: new GraphQLNonNull(GraphQLString) },
-    lastName: { type: new GraphQLNonNull(GraphQLString) },
-    email: { type: new GraphQLNonNull(GraphQLString) },
+    firstName: { type: GraphQLString },
+    lastName: { type: GraphQLString },
+    email: { type: GraphQLString },
   },
 });
 
@@ -389,7 +391,7 @@ const updateUser = {
       throw fastify.httpErrors.badRequest('User is not founded!');
     }
 
-    const updatedUser = await fastify.db.users.change(id, data);
+    const updatedUser = await fastify.db.users.change(id, { ...data });
     return updatedUser;
   },
 };
@@ -637,7 +639,7 @@ const updateProfile = {
       throw fastify.httpErrors.badRequest('Profile is not founded!');
     }
 
-    const updatedProfile = await fastify.db.profiles.change(id, data);
+    const updatedProfile = await fastify.db.profiles.change(id, { ...data });
 
     return updatedProfile;
   },

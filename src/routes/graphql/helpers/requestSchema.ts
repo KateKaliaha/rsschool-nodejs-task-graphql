@@ -53,7 +53,7 @@ const memberTypeQuery = {
     });
 
     if (memberTypeById === null) {
-      return null;
+      throw fastify.httpErrors.notFound('Member type is not founded!');
     }
 
     return memberTypeById;
@@ -131,7 +131,7 @@ const postQuery = {
     });
 
     if (postById === null) {
-      return null;
+      throw fastify.httpErrors.notFound('Post is not founded!');
     }
 
     return postById;
@@ -256,7 +256,7 @@ const userType: GraphQLOutputType = new GraphQLObjectType({
           equals: parent.id,
         });
         if (profile === null) {
-          return null;
+          throw fastify.httpErrors.notFound('Profile is not founded!');
         }
         const memberType = await fastify.db.memberTypes.findOne({
           key: 'id',
@@ -329,7 +329,7 @@ const userQuery = {
     });
 
     if (userById === null) {
-      return null;
+      throw fastify.httpErrors.notFound('User is not founded!');
     }
     return userById;
   },
@@ -423,7 +423,7 @@ const subscribeToUser = {
     });
 
     if (objectSubscribeTo === null || subscribeUser === null) {
-      return null;
+      throw fastify.httpErrors.notFound('User is not founded!');
     }
 
     subscribeUser.subscribedToUserIds = [
@@ -532,7 +532,7 @@ const profileQuery = {
     });
 
     if (profileById === null) {
-      return null;
+      throw fastify.httpErrors.notFound('Profile is not founded!');
     }
 
     return profileById;
@@ -569,7 +569,7 @@ const createProfile = {
     });
 
     if (memberTypeById === null) {
-      return null;
+      throw fastify.httpErrors.notFound('Member type is not founded!');
     }
 
     if (
@@ -577,7 +577,7 @@ const createProfile = {
         data.userId
       ) === false
     ) {
-      return null;
+      throw fastify.httpErrors.badRequest('ID must be in uuid format!');
     }
 
     const profileById = await fastify.db.profiles.findOne({
@@ -586,7 +586,7 @@ const createProfile = {
     });
 
     if (profileById) {
-      return null;
+      throw fastify.httpErrors.badRequest('User already has a profile!');
     }
 
     const newProfile = await fastify.db.profiles.create(data);
